@@ -1,3 +1,9 @@
+{{
+    config(
+        materialized = 'view'
+    )
+}}
+
 WITH staging_hosts AS (
   SELECT *
     FROM {{ ref('staging_hosts') }}

@@ -1,3 +1,9 @@
+{{
+    config(
+        materialized = 'view'
+    )
+}}
+
 WITH staging_listings AS (
   SELECT *
     FROM {{ ref('staging_listings') }}
