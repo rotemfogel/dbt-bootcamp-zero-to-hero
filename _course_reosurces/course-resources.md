@@ -530,13 +530,10 @@ models:
 The contents of `tests/dim_listings_minumum_nights.sql`:
 
 ```sql
-SELECT
-    *
-FROM
-    {{ ref('dim_listings_cleansed') }}
-WHERE minimum_nights < 1
-LIMIT 10
-
+SELECT *
+  FROM {{ ref('dim_listings_cleansed') }}
+ WHERE minimum_nights < 1
+ LIMIT 10
 ```
 
 ### Restricting test execution to a model
@@ -562,11 +559,12 @@ WHERE l.created_at >= r.review_date
 The contents of `macros/no_nulls_in_columns.sql`:
 ```sql
 {% macro no_nulls_in_columns(model) %}
-    SELECT * FROM {{ model }} WHERE
-    {% for col in adapter.get_columns_in_relation(model) -%}
-        {{ col.column }} IS NULL OR
-    {% endfor %}
-    FALSE
+SELECT *
+  FROM {{ model }}
+ WHERE {% for col in adapter.get_columns_in_relation(model) -%}
+       {{ col.column }} IS NULL OR
+       {% endfor -%}
+       FALSE
 {% endmacro %}
 ```
 
@@ -579,12 +577,9 @@ The contents of `tests/no_nulls_in_dim_listings.sql`
 The contents of `macros/positive_value.sql`
 ```sql
 {% test positive_value(model, column_name) %}
-SELECT
-    *
-FROM
-    {{ model }}
-WHERE
-    {{ column_name}} < 1
+SELECT *
+  FROM {{ model }}
+ WHERE {{ column_name}} < 1
 {% endtest %}
 ```
 
