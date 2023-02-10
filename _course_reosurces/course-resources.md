@@ -323,7 +323,9 @@ SELECT *
 
 Get every review for listing _3176_:
 ```sql
-SELECT * FROM "AIRBNB"."DEV"."FACT_REVIEWS" WHERE listing_id=3176;
+SELECT * 
+  FROM "AIRBNB"."DEV"."FACT_REVIEWS" 
+ WHERE listing_id=3176;
 ```
 
 Add a new record to the table:
@@ -385,50 +387,53 @@ curl https://dbtlearn.s3.us-east-2.amazonaws.com/seed_full_moon_dates.csv -o see
 
 ## Contents of models/sources.yml
 ```yaml
+---
 version: 2
 
 sources:
   - name: airbnb
     schema: raw
     tables:
-      - name: listings
-        identifier: raw_listings
+    - name: listings
+      identifier: raw_listings
 
-      - name: hosts
-        identifier: raw_hosts
+    - name: hosts
+      identifier: raw_hosts
 
-      - name: reviews
-        identifier: raw_reviews
-        loaded_at_field: date
-        freshness:
-          warn_after: {count: 1, period: hour}
-          error_after: {count: 24, period: hour}
+    - name: reviews
+      identifier: raw_reviews
+      loaded_at_field: date
+      freshness:
+        error_after:
+          count: 24
+          period: hour
+        warn_after:
+          count: 1
+          period: hour
 ```
 
 ## Contents of models/mart/full_moon_reviews.sql
 ```sql
-{{ config(
-  materialized = 'table',
-) }}
+{{
+    config(
+        materialized = 'table'
+    )
+}}
 
-WITH FACT_REVIEWS AS (
-    SELECT * FROM {{ ref('FACT_REVIEWS') }}
+WITH fact_reviews AS (
+    SELECT * FROM {{ ref('fact_reviews') }}
 ),
 full_moon_dates AS (
     SELECT * FROM {{ ref('seed_full_moon_dates') }}
 )
-
-SELECT
-  r.*,
-  CASE
-    WHEN fm.full_moon_date IS NULL THEN 'not full moon'
-    ELSE 'full moon'
-  END AS is_full_moon
-FROM
-  FACT_REVIEWS
-  r
-  LEFT JOIN full_moon_dates
-  fm
+SELECT r.*,
+       CASE
+         WHEN fm.full_moon_date IS NULL
+           THEN false
+         ELSE true
+       END AS is_full_moon
+  FROM fact_reviews r
+  LEFT JOIN full_moon_dates fm
   ON (TO_DATE(r.review_date) = DATEADD(DAY, 1, fm.full_moon_date))
 ```
 
@@ -441,26 +446,31 @@ The contents of `snapshots/scd_raw_listings.sql`:
 {% snapshot scd_raw_listings %}
 
 {{
-   config(
-       target_schema='dev',
-       unique_key='id',
-       strategy='timestamp',
-       updated_at='updated_at',
-       invalidate_hard_deletes=True
-   )
+    config(
+        target_schema='dev',
+        unique_key='id',
+        strategy='timestamp',
+        updated_at='updated_at',
+        invalidate_hard_deletes=True
+    )
 }}
 
-select * FROM {{ source('airbnb', 'listings') }}
+SELECT *
+ FROM {{ source('airbnb', 'listings') }}
 
 {% endsnapshot %}
 ```
 
 ### Updating the table
 ```sql
-UPDATE AIRBNB.RAW.RAW_LISTINGS SET MINIMUM_NIGHTS=30,
-    updated_at=CURRENT_TIMESTAMP() WHERE ID=3176;
+UPDATE AIRBNB.RAW.RAW_LISTINGS 
+   SET minimum_nights = 30,
+       updated_at     = CURRENT_TIMESTAMP() 
+ WHERE id=3176;
 
-SELECT * FROM AIRBNB.DEV.SCD_RAW_LISTINGS WHERE ID=3176;
+SELECT * 
+  FROM AIRBNB.DEV.SCD_RAW_LISTINGS 
+ WHERE ID=3176;
 ```
 
 ## Snapshots for hosts
