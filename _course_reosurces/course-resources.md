@@ -588,28 +588,31 @@ The contents of `packages.yml`:
 ```yaml
 packages:
   - package: dbt-labs/dbt_utils
-    version: 0.8.0
+    version: 1.0.0
 ```
 
-The contents of ```models/FACT_REVIEWS.sql```:
+The contents of ```models/fact_reviews.sql```:
 ```
 {{
-  config(
-    materialized = 'incremental',
-    on_schema_change='fail'
+    config(
+        materialized = 'incremental',
+        on_schema_change = 'fail'
     )
 }}
+
 WITH staging_reviews AS (
-  SELECT * FROM {{ ref('staging_reviews') }}
+  SELECT *
+    FROM {{ ref('staging_reviews') }}
 )
-SELECT 
-  {{ dbt_utils.surrogate_key(['listing_id', 'review_date', 'reviewer_name', 'review_text']) }}
-    AS review_id,
-  * 
+SELECT {{ dbt_utils.generate_surrogate_key(
+         ['listing_id', 'review_date', 'reviewer_name', 'review_text']
+       ) }} AS review_id,
+       *
   FROM staging_reviews
-WHERE review_text is not null
+ WHERE review_text IS NOT NULL
 {% if is_incremental() %}
-  AND review_date > (select max(review_date) from {{ this }})
+   AND review_date > (SELECT MAX(review_date)
+                        FROM {{ this }} )
 {% endif %}
 ```
 

@@ -9,7 +9,10 @@ WITH staging_reviews AS (
   SELECT *
     FROM {{ ref('staging_reviews') }}
 )
-SELECT *
+SELECT {{ dbt_utils.generate_surrogate_key(
+         ['listing_id', 'review_date', 'reviewer_name', 'review_text']
+       ) }} AS review_id,
+       *
   FROM staging_reviews
  WHERE review_text IS NOT NULL
 {% if is_incremental() %}
