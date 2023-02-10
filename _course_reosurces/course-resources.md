@@ -626,13 +626,11 @@ models:
   - name: dim_listings_cleansed
     description: Cleansed table which contains Airbnb listings.
     columns:
-      
       - name: listing_id
         description: Primary key for the listing
         tests:
           - unique
           - not_null
-        
       - name: host_id
         description: The hosts's id. References the host table.
         tests:
@@ -640,13 +638,14 @@ models:
           - relationships:
               to: ref('dim_hosts_cleansed')
               field: host_id
-
       - name: room_type
         description: Type of the apartment / room
         tests:
           - accepted_values:
-              values: ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room']
-
+              values: [ 'Entire home/apt',
+                        'Private room',
+                        'Shared room',
+                        'Hotel room' ]
       - name: minimum_nights
         description: '{{ doc("dim_listing_cleansed__minimum_nights") }}'
         tests:
@@ -658,17 +657,17 @@ models:
         tests:
           - not_null
           - unique
-      
+
       - name: host_name
         tests:
           - not_null
-      
+
       - name: is_superhost
         tests:
           - accepted_values:
-              values: ['t', 'f']
-  
-  - name: FACT_REVIEWS
+              values: [ 't', 'f' ]
+
+  - name: fact_reviews
     columns:
       - name: listing_id
         tests:
@@ -679,12 +678,11 @@ models:
       - name: reviewer_name
         tests:
           - not_null
-      
+
       - name: review_sentiment
         tests:
           - accepted_values:
-              values: ['positive', 'neutral', 'negative']
-
+              values: [ 'positive', 'neutral', 'negative' ]
 ```
 The contents of `models/docs.md`:
 ```txt
