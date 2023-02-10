@@ -23,20 +23,21 @@ CREATE USER IF NOT EXISTS dbt
   DEFAULT_WAREHOUSE='COMPUTE_WH'
   DEFAULT_ROLE='transform'
   DEFAULT_NAMESPACE='AIRBNB.RAW'
-  COMMENT='DBT user used for data transformation';
-GRANT ROLE transform to USER dbt;
+  COMMENT='DBT user used for data warehouse';
+GRANT ROLE transform TO USER dbt;
 
 -- Create our database and schemas
 CREATE DATABASE IF NOT EXISTS AIRBNB;
 CREATE SCHEMA IF NOT EXISTS AIRBNB.RAW;
+CREATE SCHEMA IF NOT EXISTS AIRBNB.DEV;
 
 -- Set up permissions to role `transform`
-GRANT ALL ON WAREHOUSE COMPUTE_WH TO ROLE transform; 
-GRANT ALL ON DATABASE AIRBNB to ROLE transform;
-GRANT ALL ON ALL SCHEMAS IN DATABASE AIRBNB to ROLE transform;
-GRANT ALL ON FUTURE SCHEMAS IN DATABASE AIRBNB to ROLE transform;
-GRANT ALL ON ALL TABLES IN SCHEMA AIRBNB.RAW to ROLE transform;
-GRANT ALL ON FUTURE TABLES IN SCHEMA AIRBNB.RAW to ROLE transform;
+GRANT ALL ON WAREHOUSE COMPUTE_WH TO ROLE transform;
+GRANT ALL ON DATABASE AIRBNB TO ROLE transform;
+GRANT ALL ON ALL SCHEMAS IN DATABASE AIRBNB TO ROLE transform;
+GRANT ALL ON FUTURE SCHEMAS IN DATABASE AIRBNB TO ROLE transform;
+GRANT ALL ON ALL TABLES IN SCHEMA AIRBNB.RAW TO ROLE transform;
+GRANT ALL ON ALL TABLES IN SCHEMA AIRBNB.DEV TO ROLE transform;
 
 ```
 
@@ -163,48 +164,39 @@ which dbt
 ## Code used in the lesson
 
 ### SRC Listings 
-`models/src/src_listings.sql`:
+`models/staging/staging_listings.sql`:
 
 ```sql
 WITH raw_listings AS (
-    SELECT
-        *
-    FROM
-        AIRBNB.RAW.RAW_LISTINGS
+  SELECT *
+    FROM AIRBNB.RAW.RAW_LISTINGS
 )
-SELECT
-    id AS listing_id,
-    name AS listing_name,
-    listing_url,
-    room_type,
-    minimum_nights,
-    host_id,
-    price AS price_str,
-    created_at,
-    updated_at
-FROM
-    raw_listings
-
+SELECT id              AS listing_id,
+       name            AS listing_name,
+       listing_url,
+       room_type,
+       minimum_nights,
+       host_id,
+       price           AS price_str,
+       created_at,
+       updated_at
+  FROM raw_listings
 ```
 
 ### SRC Reviews
-`models/src/src_reviews.sql`:
+`models/staging/staging_reviews.sql`:
 
 ```sql
 WITH raw_reviews AS (
-    SELECT
-        *
-    FROM
-        AIRBNB.RAW.RAW_REVIEWS
+  SELECT *
+    FROM AIRBNB.RAW.RAW_REVIEWS
 )
-SELECT
-    listing_id,
-    date AS review_date,
-    reviewer_name,
-    comments AS review_text,
-    sentiment AS review_sentiment
-FROM
-    raw_reviews
+SELECT listing_id,
+       date            AS review_date,
+       reviewer_name,
+       comments        AS review_text,
+       sentiment       AS review_sentiment
+  FROM raw_reviews
 ```
 
 
@@ -212,7 +204,7 @@ FROM
 
 Create a model which builds on top of our `raw_hosts` table. 
 
-1) Call the model `models/src/src_hosts.sql`
+1) Call the model `models/staging/staging_hosts.sql`
 2) Use a CTE (common table expression) to define an alias called `raw_hosts`. This CTE select every column from the raw hosts table `AIRBNB.RAW.RAW_HOSTS`
 3) In your final `SELECT`, select every column and record from `raw_hosts` and rename the following columns:
    * `id` to `host_id`
@@ -222,19 +214,15 @@ Create a model which builds on top of our `raw_hosts` table.
 
 ```sql
 WITH raw_hosts AS (
-    SELECT
-        *
-    FROM
-       AIRBNB.RAW.RAW_HOSTS
+  SELECT *
+    FROM AIRBNB.RAW.RAW_HOSTS
 )
-SELECT
-    id AS host_id,
-    NAME AS host_name,
-    is_superhost,
-    created_at,
-    updated_at
-FROM
-    raw_hosts
+SELECT id           AS host_id,
+       name         AS host_name,
+       is_superhost,
+       created_at,
+       updated_at
+  FROM raw_hosts
 ```
 
 # Models
@@ -244,32 +232,23 @@ FROM
 `models/dim/dim_listings_cleansed.sql`:
 
 ```sql
-WITH src_listings AS (
-  SELECT
-    *
-  FROM
-    {{ ref('src_listings') }}
+WITH staging_listings AS (
+  SELECT *
+    FROM {{ ref('staging_listings') }}
 )
-SELECT
-  listing_id,
-  listing_name,
-  room_type,
-  CASE
-    WHEN minimum_nights = 0 THEN 1
-    ELSE minimum_nights
-  END AS minimum_nights,
-  host_id,
-  REPLACE(
-    price_str,
-    '$'
-  ) :: NUMBER(
-    10,
-    2
-  ) AS price,
-  created_at,
-  updated_at
-FROM
-  src_listings
+SELECT listing_id,
+       listing_name,
+       room_type,
+       CASE
+         WHEN minimum_nights = 0
+           THEN 1
+         ELSE minimum_nights
+       END                                      AS minimum_nights,
+       host_id,
+       REPLACE(price_str, '$') :: NUMBER(10, 2) AS price,
+       created_at,
+       updated_at
+  FROM staging_listings
 ```
 
 ### DIM hosts
@@ -277,34 +256,26 @@ FROM
 
 ```sql
 {{
-  config(
-    materialized = 'view'
+    config(
+        materialized = 'view'
     )
 }}
-
-WITH src_hosts AS (
-    SELECT
-        *
-    FROM
-        {{ ref('src_hosts') }}
+WITH staging_hosts AS (
+  SELECT *
+    FROM {{ ref('staging_hosts') }}
 )
-SELECT
-    host_id,
-    NVL(
-        host_name,
-        'Anonymous'
-    ) AS host_name,
-    is_superhost,
-    created_at,
-    updated_at
-FROM
-    src_hosts
+SELECT host_id,
+       NVL(host_name, 'Anonymous') AS host_name,
+       is_superhost,
+       created_at,
+       updated_at
+  FROM staging_hosts
 ```
 
 ## Exercise
 
 Create a new model in the `models/dim/` folder called `dim_hosts_cleansed.sql`.
- * Use a CTE to reference the `src_hosts` model
+ * Use a CTE to reference the `staging_hosts` model
  * SELECT every column and every record, and add a cleansing step to host_name:
    * If host_name is not null, keep the original value 
    * If host_name is null, replace it with the value ‘Anonymous’
@@ -315,54 +286,50 @@ Execute `dbt run` and verify that your model has been created
 ### Solution
 
 ```sql
-WITH src_hosts AS (
-    SELECT
-        *
-    FROM
-        {{ ref('src_hosts') }}
+WITH staging_hosts AS (
+  SELECT *
+    FROM {{ ref('staging_hosts') }}
 )
-SELECT
-    host_id,
-    NVL(
-        host_name,
-        'Anonymous'
-    ) AS host_name,
-    is_superhost,
-    created_at,
-    updated_at
-FROM
-    src_hosts
+SELECT host_id,
+       NVL(host_name, 'Anonymous') AS host_name,
+       is_superhost,
+       created_at,
+       updated_at
+  FROM staging_hosts
 ```
 
 ## Incremental Models
-The `fct/fct_reviews.sql` model:
+The `fact/FACT_REVIEWS.sql` model:
 ```sql
 {{
-  config(
-    materialized = 'incremental',
-    on_schema_change='fail'
+    config(
+        materialized = 'incremental',
+        on_schema_change = 'fail'
     )
 }}
-WITH src_reviews AS (
-  SELECT * FROM {{ ref('src_reviews') }}
-)
-SELECT * FROM src_reviews
-WHERE review_text is not null
 
+WITH staging_reviews AS (
+  SELECT *
+    FROM {{ ref('staging_reviews') }}
+)
+SELECT *
+  FROM staging_reviews
+ WHERE review_text IS NOT NULL
 {% if is_incremental() %}
-  AND review_date > (select max(review_date) from {{ this }})
+   AND review_date > (SELECT MAX(review_date)
+                        FROM {{ this }} )
 {% endif %}
 ```
 
 Get every review for listing _3176_:
 ```sql
-SELECT * FROM "AIRBNB"."DEV"."FCT_REVIEWS" WHERE listing_id=3176;
+SELECT * FROM "AIRBNB"."DEV"."FACT_REVIEWS" WHERE listing_id=3176;
 ```
 
 Add a new record to the table:
 ```sql
 INSERT INTO "AIRBNB"."RAW"."RAW_REVIEWS"
-VALUES (3176, CURRENT_TIMESTAMP(), 'Zoltan', 'excellent stay!', 'positive');
+VALUES (3176, CURRENT_TIMESTAMP(), 'Rotem', 'excellent stay!', 'positive');
 
 ```
 
@@ -373,38 +340,34 @@ dbt run --full-refresh
 ## DIM listings with hosts
 The contents of `dim/dim_listings_w_hosts.sql`:
 ```sql
-WITH
-l AS (
-    SELECT
-        *
-    FROM
-        {{ ref('dim_listings_cleansed') }}
+WITH l AS (
+  SELECT *
+    FROM {{ ref('dim_listings_cleansed') }}
 ),
 h AS (
-    SELECT * 
+  SELECT *
     FROM {{ ref('dim_hosts_cleansed') }}
 )
-
-SELECT 
-    l.listing_id,
-    l.listing_name,
-    l.room_type,
-    l.minimum_nights,
-    l.price,
-    l.host_id,
-    h.host_name,
-    h.is_superhost as host_is_superhost,
-    l.created_at,
-    GREATEST(l.updated_at, h.updated_at) as updated_at
-FROM l
-LEFT JOIN h ON (h.host_id = l.host_id)
+SELECT listing_id,
+       listing_name,
+       room_type,
+       minimum_nights,
+       price,
+       l.host_id,
+       host_name,
+       is_superhost                         AS host_is_superhost,
+       l.created_at,
+       GREATEST(l.updated_at, h.updated_at) AS updated_at
+  FROM h
+  JOIN l
+ USING (host_id)
 ```
 
 ## Dropping the views after ephemeral materialization
 ```sql
-DROP VIEW AIRBNB.DEV.SRC_HOSTS;
-DROP VIEW AIRBNB.DEV.SRC_LISTINGS;
-DROP VIEW AIRBNB.DEV.SRC_REVIEWS;
+DROP VIEW AIRBNB.DEV.STAGING_HOSTS;
+DROP VIEW AIRBNB.DEV.STAGING_LISTINGS;
+DROP VIEW AIRBNB.DEV.STAGING_REVIEWS;
 ```
 
 # Sources and Seeds
@@ -448,8 +411,8 @@ sources:
   materialized = 'table',
 ) }}
 
-WITH fct_reviews AS (
-    SELECT * FROM {{ ref('fct_reviews') }}
+WITH FACT_REVIEWS AS (
+    SELECT * FROM {{ ref('FACT_REVIEWS') }}
 ),
 full_moon_dates AS (
     SELECT * FROM {{ ref('seed_full_moon_dates') }}
@@ -462,7 +425,7 @@ SELECT
     ELSE 'full moon'
   END AS is_full_moon
 FROM
-  fct_reviews
+  FACT_REVIEWS
   r
   LEFT JOIN full_moon_dates
   fm
@@ -573,13 +536,13 @@ dbt test --select dim_listings_cleansed
 
 ## Exercise
 
-Create a singular test in `tests/consistent_created_at.sql` that checks that there is no review date that is submitted before its listing was created: Make sure that every `review_date` in `fct_reviews` is more recent than the associated `created_at` in `dim_listings_cleansed`.
+Create a singular test in `tests/consistent_created_at.sql` that checks that there is no review date that is submitted before its listing was created: Make sure that every `review_date` in `FACT_REVIEWS` is more recent than the associated `created_at` in `dim_listings_cleansed`.
 
 
 ### Solution
 ```sql
 SELECT * FROM {{ ref('dim_listings_cleansed') }} l
-INNER JOIN {{ ref('fct_reviews') }} r
+INNER JOIN {{ ref('FACT_REVIEWS') }} r
 USING (listing_id)
 WHERE l.created_at >= r.review_date
 ```
@@ -623,7 +586,7 @@ packages:
     version: 0.8.0
 ```
 
-The contents of ```models/fct_reviews.sql```:
+The contents of ```models/FACT_REVIEWS.sql```:
 ```
 {{
   config(
@@ -631,14 +594,14 @@ The contents of ```models/fct_reviews.sql```:
     on_schema_change='fail'
     )
 }}
-WITH src_reviews AS (
-  SELECT * FROM {{ ref('src_reviews') }}
+WITH staging_reviews AS (
+  SELECT * FROM {{ ref('staging_reviews') }}
 )
 SELECT 
   {{ dbt_utils.surrogate_key(['listing_id', 'review_date', 'reviewer_name', 'review_text']) }}
     AS review_id,
   * 
-  FROM src_reviews
+  FROM staging_reviews
 WHERE review_text is not null
 {% if is_incremental() %}
   AND review_date > (select max(review_date) from {{ this }})
@@ -697,7 +660,7 @@ models:
           - accepted_values:
               values: ['t', 'f']
   
-  - name: fct_reviews
+  - name: FACT_REVIEWS
     columns:
       - name: listing_id
         tests:
