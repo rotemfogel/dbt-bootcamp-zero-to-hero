@@ -732,27 +732,23 @@ GRANT SELECT ON ALL TABLES IN SCHEMA AIRBNB.DEV TO ROLE REPORTER;
 GRANT SELECT ON ALL VIEWS IN SCHEMA AIRBNB.DEV TO ROLE REPORTER;
 GRANT SELECT ON FUTURE TABLES IN SCHEMA AIRBNB.DEV TO ROLE REPORTER;
 GRANT SELECT ON FUTURE VIEWS IN SCHEMA AIRBNB.DEV TO ROLE REPORTER;
-
 ```
 
 ## Analyses
 The contents of `analyses/full_moon_no_sleep.sql`:
 ```sql
 WITH mart_fullmoon_reviews AS (
-    SELECT * FROM {{ ref('mart_fullmoon_reviews') }}
+  SELECT *
+    FROM {{ ref('mart_fullmoon_reviews') }}
 )
-SELECT
-    is_full_moon,
-    review_sentiment,
-    COUNT(*) as reviews
-FROM
-    mart_fullmoon_reviews
-GROUP BY
-    is_full_moon,
-    review_sentiment
-ORDER BY
-    is_full_moon,
-    review_sentiment
+SELECT is_full_moon,
+       review_sentiment,
+       COUNT(*) AS reviews
+  FROM mart_fullmoon_reviews
+ GROUP BY is_full_moon,
+          review_sentiment
+ ORDER BY is_full_moon,
+          review_sentiment
 ```
 
 ## Exposures
@@ -773,8 +769,8 @@ exposures:
       - ref('mart_fullmoon_reviews')
 
     owner:
-      name: Zoltan C. Toth
-      email: hello@learndbt.com
+      name: Rotem Fogel
+      email: rotemfo@gmail.com
 ```
 
 ## Post-hook
@@ -782,7 +778,7 @@ Add this to your `dbt_project.yml`:
 
 ```
 +post-hook:
-      - "GRANT SELECT ON {{ this }} TO ROLE REPORTER"
+  - "GRANT SELECT ON {{ this }} TO ROLE REPORTER"
 ```
 
 # Debugging Tests and Testing with dbt-expectations
